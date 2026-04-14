@@ -1,0 +1,21 @@
+{
+  "name": "polymarket-5m",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@types/react": "^19.2.14",
+    "ink": "^7.0.0",
+    "react": "^19.2.5"
+  }
+}
