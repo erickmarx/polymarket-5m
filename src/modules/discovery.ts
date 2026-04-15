@@ -3,13 +3,9 @@ import { logger } from '../logger.ts';
 import type { GammaEvent, MarketState } from '../types.ts';
 
 export class DiscoveryModule {
-  // conditionId → MarketState (mercado vigente por série)
   private markets: Map<string, MarketState> = new Map();
-  // tokenId → conditionId (lookup rápido no WebSocket)
   private tokenIndex: Map<string, string> = new Map();
-  // seriesId → buffer de mercados futuros ordenados por endDate
   private buffers: Map<number, MarketState[]> = new Map();
-  // seriesId → timestamp do último fetch bem-sucedido
   private lastFetch: Map<number, number> = new Map();
 
   async fetchAllSeries(): Promise<void> {
@@ -27,7 +23,6 @@ export class DiscoveryModule {
     const now = Date.now();
     const last = this.lastFetch.get(seriesId) ?? 0;
 
-    // Throttle de 15s para não sobrecarregar em caso de buffer baixo frequente
     if (now - last < 15_000) {
       logger.debug(`[Discovery] série ${seriesId} fetch skipped (throttled)`);
       return;
@@ -46,18 +41,12 @@ export class DiscoveryModule {
         return;
       }
 
-      logger.debug(`[Discovery] série ${seriesId} — ${events.length} eventos recebidos`);
       const nowMs = Date.now();
 
       const parsed = events
-        .map((raw) => this.parseEvent(raw, nowMs))
+        .map((raw) => this.parseEvent(raw, nowMs, seriesId))
         .filter((m): m is MarketState => m !== null && m.marketEndDate > nowMs)
         .sort((a, b) => a.marketEndDate - b.marketEndDate);
-
-      logger.debug(`[Discovery] série ${seriesId} parsed:`, parsed);
-      logger.debug(
-        `[Discovery] série ${seriesId} — ${parsed.length}/${events.length} mercados válidos no buffer`,
-      );
 
       this.buffers.set(seriesId, parsed);
       this.lastFetch.set(seriesId, now);
@@ -67,22 +56,13 @@ export class DiscoveryModule {
     }
   }
 
-  private parseEvent(raw: GammaEvent, nowMs: number): MarketState | null {
+  private parseEvent(raw: GammaEvent, nowMs: number, seriesId: number): MarketState | null {
     try {
       const market = raw.markets[0];
-      if (!market) {
-        logger.debug(`[Discovery] parseEvent skip ${raw.id} — sem markets[0]`);
-        return null;
-      }
+      if (!market) return null;
 
       const outcomes: string[] = market.outcomes ? JSON.parse(market.outcomes) : ['Yes', 'No'];
       const tokenIds: string[] = market.clobTokenIds ? JSON.parse(market.clobTokenIds) : [];
-
-      logger.debug(
-        `[Discovery] parseEvent ${raw.id} outcomes=${JSON.stringify(
-          outcomes,
-        )} tokens=${tokenIds.length}`,
-      );
 
       let upTokenId = '';
       let downTokenId = '';
@@ -93,40 +73,14 @@ export class DiscoveryModule {
         else if (['no', 'down'].includes(label)) downTokenId = tokenIds[i] ?? '';
       });
 
-      // Fallback se labels não bateram
-      if (!upTokenId) {
-        logger.debug(`[Discovery] parseEvent ${raw.id} — fallback upToken (label não reconhecido)`);
-        upTokenId = tokenIds[0] ?? '';
-      }
-      if (!downTokenId) {
-        logger.debug(
-          `[Discovery] parseEvent ${raw.id} — fallback downToken (label não reconhecido)`,
-        );
-        downTokenId = tokenIds[1] ?? '';
-      }
-
-      if (!upTokenId || !downTokenId) {
-        logger.warn(
-          `[Discovery] parseEvent skip ${raw.id} — tokenIds insuficientes (up="${upTokenId}" down="${downTokenId}")`,
-        );
-        return null;
-      }
+      if (!upTokenId || !downTokenId) return null;
 
       const endDate = new Date(raw.endDate).getTime();
-      if (isNaN(endDate)) {
-        logger.warn(`[Discovery] parseEvent skip ${raw.id} — endDate inválido: "${raw.endDate}"`);
-        return null;
-      }
-
-      const msSinceEnd = nowMs - endDate;
-      if (msSinceEnd > 0) {
-        logger.debug(
-          `[Discovery] parseEvent ${raw.id} — expirado há ${Math.round(msSinceEnd / 1000)}s`,
-        );
-      }
+      if (isNaN(endDate)) return null;
 
       return {
         conditionId: raw.id,
+        seriesId,
         question: raw.title,
         upTokenId,
         downTokenId,
@@ -137,14 +91,11 @@ export class DiscoveryModule {
         updatedAt: 0,
         marketEndDate: endDate,
       };
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.error(`[Discovery] Falha ao parsear evento ${raw.id}: ${message}`);
+    } catch {
       return null;
     }
   }
 
-  // Chamado periodicamente pelo MonitoringModule para renovar mercados expirados
   async refreshExpired(): Promise<boolean> {
     const nowMs = Date.now();
     const previousMarkets = new Set(this.markets.keys());
@@ -153,33 +104,20 @@ export class DiscoveryModule {
       const buffer = this.buffers.get(seriesId) ?? [];
       const active = buffer.filter((m) => m.marketEndDate > nowMs);
 
-      // Se o buffer mudou (algum mercado expirou), atualizamos
       if (active.length !== buffer.length) {
         this.buffers.set(seriesId, active);
       }
 
-      // Renova se buffer está baixo (menos de 3 mercados futuros)
-      // OU se o mercado ATUAL está a menos de 60 segundos de acabar (proativo)
       const current = active.find((m) => m.marketEndDate > nowMs);
       const isExpiringSoon = current && current.marketEndDate - nowMs < 60_000;
 
       if (active.length <= 2 || isExpiringSoon) {
-        if (active.length <= 2) {
-          logger.log(
-            `[Discovery] série ${seriesId} — buffer baixo (${active.length}), renovando via API...`,
-          );
-        } else {
-          logger.debug(
-            `[Discovery] série ${seriesId} — mercado atual expira em breve, antecipando fetch...`,
-          );
-        }
         await this.fetchSeries(seriesId);
       }
     }
 
     this.rebuildIndexes();
 
-    // Verifica se os mercados ativos (vigentes) mudaram
     const currentMarkets = new Set(this.markets.keys());
     if (previousMarkets.size !== currentMarkets.size) return true;
     for (const id of currentMarkets) {
@@ -195,23 +133,12 @@ export class DiscoveryModule {
     const now = Date.now();
 
     for (const buffer of this.buffers.values()) {
-      // Pega o primeiro mercado do buffer que ainda não terminou
       const current = buffer.find((m) => m.marketEndDate > now);
       if (!current) continue;
 
       this.markets.set(current.conditionId, current);
       this.tokenIndex.set(current.upTokenId, current.conditionId);
       this.tokenIndex.set(current.downTokenId, current.conditionId);
-    }
-
-    logger.log(
-      `[Discovery] Index rebuilt: ${this.markets.size} mercados, ${this.tokenIndex.size} tokens`,
-    );
-    for (const [condId, market] of this.markets) {
-      const end = new Date(market.marketEndDate).toISOString();
-      logger.debug(
-        `[Discovery]   ${condId.slice(0, 10)}… "${market.question.slice(0, 40)}" ends=${end}`,
-      );
     }
   }
 
