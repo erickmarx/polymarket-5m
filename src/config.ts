@@ -1,6 +1,7 @@
 // Bun carrega .env automaticamente — nenhum import necessário
 
 export const CONFIG = {
+  debug: process.env.DEBUG === 'true',
   api: {
     gammaBaseUrl: process.env.GAMMA_BASE_URL || 'https://gamma-api.polymarket.com',
     clobBaseUrl: process.env.CLOB_BASE_URL || 'https://clob.polymarket.com',
@@ -17,7 +18,7 @@ export const CONFIG = {
   monitoring: {
     heartbeatIntervalMs: 30_000,
     // Até 8 seriesIds de cripto para monitorar em paralelo (imutáveis entre mercados)
-    seriesIds: (process.env.SERIES_IDS ?? '')
+    seriesIds: (process.env.SERIES_IDS ?? '10684,10685,10686')
       .split(',')
       .map(s => parseInt(s.trim(), 10))
       .filter(n => !isNaN(n))

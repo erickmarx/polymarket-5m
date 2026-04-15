@@ -1,4 +1,5 @@
 import { DiscoveryModule } from './modules/discovery.ts';
+import { logger } from './logger.ts';
 import { MonitoringModule } from './modules/monitoring.ts';
 import { ExecutionModule } from './modules/execution.ts';
 import { ResolutionHandler } from './modules/resolution.ts';
@@ -22,8 +23,8 @@ const exampleStrategy: OrderStrategy = {
 };
 
 async function main() {
-  console.log(`[Main] Iniciando Polymarket Monitor (mode: ${CONFIG.trading.mode})`);
-  console.log(`[Main] Séries configuradas: ${CONFIG.monitoring.seriesIds.length}`);
+  logger.log(`[Main] Iniciando Polymarket Monitor (mode: ${CONFIG.trading.mode})`);
+  logger.log(`[Main] Séries configuradas: ${CONFIG.monitoring.seriesIds.length}`);
 
   const discovery = new DiscoveryModule();
   const execution = new ExecutionModule();
@@ -34,7 +35,7 @@ async function main() {
   await discovery.fetchAllSeries();
 
   if (discovery.getMarkets().size === 0) {
-    console.error('[Main] Nenhum mercado carregado — verifique SERIES_IDS no .env');
+    logger.error('[Main] Nenhum mercado carregado — verifique SERIES_IDS no .env');
     process.exit(1);
   }
 
@@ -45,21 +46,29 @@ async function main() {
     },
   );
 
-  // Resolve ordens filled ainda não resolvidas
+  // Resolve ordens filled assim que o mercado correspondente encerrar
   const resolvedIds = new Set<string>();
-  setInterval(() => {
+  setInterval(async () => {
     const markets = discovery.getMarkets();
     const tokenIndex = discovery.buildTokenIndex();
+    
     for (const order of execution.getFilledOrders()) {
       if (resolvedIds.has(order.id)) continue;
+      
       const conditionId = tokenIndex.get(order.tokenId);
       if (!conditionId) continue;
+      
       const market = markets.get(conditionId);
-      if (!market) continue;
-      resolvedIds.add(order.id);
-      resolution.resolve(conditionId, market.question, order);
+      // Se o mercado ainda está no Discovery, esperamos ele expirar para tentar resolver
+      if (market && market.marketEndDate > Date.now()) continue;
+
+      // Tenta resolver — se retornar UNRESOLVED/UNKNOWN, tentaremos novamente no próximo ciclo
+      const record = await resolution.resolve(conditionId, market?.question ?? "Unknown", order);
+      if (record.resolvedOutcome !== 'UNRESOLVED' && record.resolvedOutcome !== 'UNKNOWN') {
+        resolvedIds.add(order.id);
+      }
     }
-  }, 5_000);
+  }, 10_000); // 10s é suficiente para resolução sem pesar no log/API
 
   monitoring.start();
 
@@ -74,7 +83,7 @@ async function main() {
   });
 
   const shutdown = () => {
-    console.log('\n[Main] Encerrando...');
+    logger.log('\n[Main] Encerrando...');
     monitoring.stop();
     execution.cancelAll();
     unmount();
@@ -86,6 +95,6 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error('[Main] Fatal:', err);
+  logger.error('[Main] Fatal:', err);
   process.exit(1);
 });

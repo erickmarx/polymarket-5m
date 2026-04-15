@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.ts';
+import { logger } from '../logger.ts';
 import type { Order, TradeRecord } from '../types.ts';
 
 export class ResolutionHandler {
@@ -10,21 +11,23 @@ export class ResolutionHandler {
     filledOrder: Order,
   ): Promise<TradeRecord> {
     const outcome = await this.fetchResolution(conditionId);
-    const pnl = this.calculatePnL(filledOrder, outcome);
-
+    
     const record: TradeRecord = {
       conditionId,
       question,
       order: filledOrder,
       resolvedOutcome: outcome,
-      pnl,
+      pnl: 0,
       resolvedAt: Date.now(),
     };
 
-    this.history.push(record);
-    console.log(
-      `[Resolution] "${question}" → ${outcome} | PnL: ${pnl > 0 ? '+' : ''}${pnl.toFixed(4)} USDC`,
-    );
+    if (outcome !== 'UNRESOLVED' && outcome !== 'UNKNOWN') {
+      record.pnl = this.calculatePnL(filledOrder, outcome);
+      this.history.push(record);
+      logger.log(
+        `[Resolution] "${question}" → ${outcome} | PnL: ${record.pnl > 0 ? '+' : ''}${record.pnl.toFixed(4)} USDC`,
+      );
+    }
 
     return record;
   }
@@ -49,7 +52,7 @@ export class ResolutionHandler {
       return 'UNRESOLVED';
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[Resolution] Falha ao buscar resolução: ${message}`);
+      logger.error(`[Resolution] Falha ao buscar resolução: ${message}`);
       return 'UNKNOWN';
     }
   }

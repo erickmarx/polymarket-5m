@@ -1,14 +1,20 @@
 import { CONFIG } from '../config.ts';
+import { logger } from '../logger.ts';
 import type { MarketState } from '../types.ts';
 import type { DiscoveryModule } from './discovery.ts';
 
 type PriceChangeCallback = (state: MarketState) => void;
 
-interface WsBookMessage {
-  event_type: string;
+interface WsPriceChange {
   asset_id: string;
   best_bid?: string;
   best_ask?: string;
+}
+
+interface WsMessage {
+  event_type: string;
+  market?: string;
+  price_changes?: WsPriceChange[];
 }
 
 export class MonitoringModule {
@@ -42,31 +48,34 @@ export class MonitoringModule {
   }
 
   private startRefreshCycle(): void {
-    // A cada 30s verifica se algum mercado expirou e re-subscribir se necessário
+    // A cada 1s verifica se algum mercado expirou e re-subscribir se necessário
+    // discovery.refreshExpired agora cuida de não sobrecarregar API e só reportar 'changed' se o mercado ATIVO mudou.
     this.refreshTimer = setInterval(async () => {
       const changed = await this.discovery.refreshExpired();
       if (changed) {
+        logger.log('[Monitoring] Mercados ativos mudaram — atualizando subscrições...');
         this.markets = this.discovery.getMarkets();
         this.tokenIndex = this.discovery.buildTokenIndex();
+        
         // Re-subscribir com novos tokens (fecha e reabre)
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.close();
         }
       }
-    }, 30_000);
+    }, 1_000);
   }
 
   private connect(): void {
     if (this.markets.size === 0) {
-      console.log('[Monitoring] Nenhum mercado para monitorar');
+      logger.log('[Monitoring] Nenhum mercado para monitorar');
       return;
     }
 
-    console.log(`[Monitoring] Conectando a ${CONFIG.api.wsUrl}`);
+    logger.log(`[Monitoring] Conectando a ${CONFIG.api.wsUrl}`);
     this.ws = new WebSocket(CONFIG.api.wsUrl);
 
     this.ws.addEventListener('open', () => {
-      console.log('[Monitoring] WebSocket conectado');
+      logger.log('[Monitoring] WebSocket conectado');
       this.subscribe();
       this.startHeartbeat();
     });
@@ -76,7 +85,7 @@ export class MonitoringModule {
     });
 
     this.ws.addEventListener('close', () => {
-      console.log('[Monitoring] WebSocket fechado — reconectando...');
+      logger.log('[Monitoring] WebSocket fechado — reconectando...');
       this.clearHeartbeat();
       if (this.isRunning) {
         setTimeout(() => this.connect(), 500);
@@ -84,7 +93,7 @@ export class MonitoringModule {
     });
 
     this.ws.addEventListener('error', () => {
-      console.error('[Monitoring] Erro WebSocket');
+      logger.error('[Monitoring] Erro WebSocket');
     });
   }
 
@@ -101,34 +110,38 @@ export class MonitoringModule {
     };
 
     this.ws?.send(JSON.stringify(payload));
-    console.log(`[Monitoring] Subscrito a ${this.markets.size} mercados (${allTokenIds.length} tokens)`);
+    logger.log(`[Monitoring] Subscrito a ${this.markets.size} mercados (${allTokenIds.length} tokens)`);
   }
 
   private handleMessage(raw: string): void {
     try {
-      const msgs: WsBookMessage[] = JSON.parse(raw);
-      if (!Array.isArray(msgs)) return;
+      const msg: WsMessage = JSON.parse(raw);
+      if (msg.event_type !== 'price_change') return;
+      if (!Array.isArray(msg.price_changes)) return;
 
-      for (const msg of msgs) {
-        if (msg.event_type !== 'price_change') continue;
-        this.applyPriceChange(msg);
+      for (const change of msg.price_changes) {
+        this.applyPriceChange(change);
       }
     } catch {
       // frames não-JSON — ignorar
     }
   }
-
-  private applyPriceChange(msg: WsBookMessage): void {
+  
+  private applyPriceChange(msg: WsPriceChange): void {
     const conditionId = this.tokenIndex.get(msg.asset_id);
-    if (!conditionId) return;
+    if (!conditionId) {
+      logger.debug(`[Monitoring] token desconhecido ignorado: ${msg.asset_id.slice(0, 12)}…`);
+      return;
+    }
 
     const market = this.markets.get(conditionId);
     if (!market) return;
 
     const bid = parseFloat(msg.best_bid ?? '0');
     const ask = parseFloat(msg.best_ask ?? '0');
+    const isUp = msg.asset_id === market.upTokenId;
 
-    if (msg.asset_id === market.upTokenId) {
+    if (isUp) {
       market.bestBidUp = bid;
       market.bestAskUp = ask;
     } else {
@@ -137,6 +150,9 @@ export class MonitoringModule {
     }
 
     market.updatedAt = Date.now();
+
+    logger.debug(`[Monitoring] ${conditionId.slice(0, 8)}… ${isUp ? 'UP' : 'DOWN'} bid=${bid} ask=${ask}`);
+
     this.onPriceChange(market);
   }
 
