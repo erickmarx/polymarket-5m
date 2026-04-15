@@ -40,6 +40,7 @@ export interface Candle {
 
 export interface Order {
   id: string;
+  strategyId: string;
   tokenId: string;
   side: "BUY" | "SELL";
   size: number;
@@ -59,12 +60,13 @@ export interface TradeRecord {
 }
 
 export type OrderStrategy = {
+  id: string;
   seriesIds: number[];
   shouldExecute: (state: MarketState, history: Candle[]) => boolean;
   getOrderPayload: (
     state: MarketState,
     history: Candle[],
-  ) => Omit<Order, "id" | "status" | "createdAt">;
+  ) => Omit<Order, "id" | "status" | "createdAt" | "strategyId">;
   shouldExit: (
     state: MarketState,
     currentPosition: Order,
@@ -74,5 +76,5 @@ export type OrderStrategy = {
     state: MarketState,
     currentPosition: Order,
     history: Candle[],
-  ) => Omit<Order, "id" | "status" | "createdAt">;
+  ) => Omit<Order, "id" | "status" | "createdAt" | "strategyId">;
 };
