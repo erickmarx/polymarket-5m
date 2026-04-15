@@ -215,6 +215,10 @@ export class DiscoveryModule {
     }
   }
 
+  getBuffers(): Map<number, MarketState[]> {
+    return this.buffers;
+  }
+
   getMarkets(): Map<string, MarketState> {
     return this.markets;
   }

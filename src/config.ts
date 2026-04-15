@@ -3,10 +3,12 @@
 export const CONFIG = {
   debug: process.env.DEBUG === 'true',
   api: {
-    gammaBaseUrl: process.env.GAMMA_BASE_URL || 'https://gamma-api.polymarket.com',
-    clobBaseUrl: process.env.CLOB_BASE_URL || 'https://clob.polymarket.com',
-    wsUrl: process.env.WS_URL || 'wss://ws-subscriptions-clob.polymarket.com/ws/market',
-  },
+    gammaBaseUrl: process.env.GAMMA_BASE_URL || "https://gamma-api.polymarket.com",
+    clobBaseUrl: process.env.CLOB_BASE_URL || "https://clob.polymarket.com",
+    wsUrl: process.env.WS_URL || "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+    rtdsUrl: process.env.RTDS_URL || "wss://ws-live-data.polymarket.com",
+    },
+
   trading: {
     mode: (process.env.TRADING_MODE || 'dryrun') as 'live' | 'dryrun',
     privateKey: process.env.PRIVATE_KEY || '',

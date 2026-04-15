@@ -1,63 +1,101 @@
-import { DiscoveryModule } from './modules/discovery.ts';
-import { logger } from './logger.ts';
-import { MonitoringModule } from './modules/monitoring.ts';
-import { ExecutionModule } from './modules/execution.ts';
-import { ResolutionHandler } from './modules/resolution.ts';
-import { startDashboard } from './ui/cli.tsx';
-import { CONFIG } from './config.ts';
-import type { MarketState, Order, OrderStrategy } from './types.ts';
+import { DiscoveryModule } from "./modules/discovery.ts";
+import { logger } from "./logger.ts";
+import { MonitoringModule } from "./modules/monitoring.ts";
+import { ExecutionModule } from "./modules/execution.ts";
+import { ResolutionHandler } from "./modules/resolution.ts";
+import { PriceHistoryModule } from "./modules/price-history.ts";
+import { startDashboard } from "./ui/cli.tsx";
+import { CONFIG } from "./config.ts";
+import type { MarketState, Order, OrderStrategy, Candle } from "./types.ts";
 
 // ─── Estratégia de exemplo: compra UP se ask < 0.45 ──────────────────────────
 const exampleStrategy: OrderStrategy = {
-  shouldExecute(state: MarketState): boolean {
-    return state.bestAskUp > 0 && state.bestAskUp < 0.45;
+  shouldExecute(state: MarketState, history: Candle[]): boolean {
+    // Exemplo: só entra se tivermos histórico completo e o preço caiu no último candle
+    if (history.length < 2) return state.bestAskUp > 0 && state.bestAskUp < 0.45;
+    const lastCandle = history[history.length - 1];
+    return state.bestAskUp > 0 && state.bestAskUp < 0.45 && lastCandle.close < lastCandle.open;
   },
-  getOrderPayload(state: MarketState) {
+  getOrderPayload(state: MarketState, _history: Candle[]) {
     return {
       tokenId: state.upTokenId,
-      side: 'BUY' as const,
+      side: "BUY" as const,
       size: 10,
       price: state.bestAskUp,
     };
   },
-  shouldExit(state: MarketState, currentPosition: Order): boolean {
-    // Exemplo: sai se tiver lucro de 5% ou prejuízo de 2%
+  shouldExit(state: MarketState, currentPosition: Order, _history: Candle[]): boolean {
     const currentPrice =
-      currentPosition.tokenId === state.upTokenId ? state.bestBidUp : state.bestBidDown;
+      currentPosition.tokenId === state.upTokenId
+        ? state.bestBidUp
+        : state.bestBidDown;
     if (currentPrice === 0) return false;
     const pnl = currentPrice - currentPosition.price;
     return pnl > 0.05 || pnl < -0.02;
   },
-  getExitPayload(state: MarketState, currentPosition: Order) {
+  getExitPayload(state: MarketState, currentPosition: Order, _history: Candle[]) {
     return {
       tokenId: currentPosition.tokenId,
-      side: 'SELL' as const,
+      side: "SELL" as const,
       size: currentPosition.size,
-      price: currentPosition.tokenId === state.upTokenId ? state.bestBidUp : state.bestBidDown,
+      price:
+        currentPosition.tokenId === state.upTokenId
+          ? state.bestBidUp
+          : state.bestBidDown,
     };
   },
 };
 
 async function main() {
-  logger.log(`[Main] Iniciando Polymarket Monitor (mode: ${CONFIG.trading.mode})`);
-  logger.log(`[Main] Séries configuradas: ${CONFIG.monitoring.seriesIds.length}`);
+  logger.log(
+    `[Main] Iniciando Polymarket 5M Monitor (mode: ${CONFIG.trading.mode})`,
+  );
+  logger.log(
+    `[Main] Séries configuradas: ${CONFIG.monitoring.seriesIds.length}`,
+  );
 
   const discovery = new DiscoveryModule();
-  const execution = new ExecutionModule();
+  const priceHistory = new PriceHistoryModule();
+  const execution = new ExecutionModule(priceHistory);
   const resolution = new ResolutionHandler();
 
   execution.setStrategy(exampleStrategy);
 
+  // 1. Carrega mercados do Polymarket
   await discovery.fetchAllSeries();
 
   if (discovery.getMarkets().size === 0) {
-    logger.error('[Main] Nenhum mercado carregado — verifique SERIES_IDS no .env');
+    logger.error("[Main] Nenhum mercado carregado — verifique SERIES_IDS");
     process.exit(1);
   }
 
-  const monitoring = new MonitoringModule(discovery, (state: MarketState) => {
-    execution.evaluate(state);
-  });
+  // 2. Carrega histórico da Binance
+  await priceHistory.bootstrap();
+
+  // 3. Inicializa mapeamento de mercados para ativos no ExecutionModule
+  const updateMaps = () => {
+    const seriesToAsset = CONFIG.monitoring.seriesToAssetMap;
+    const conditionToAsset = new Map<string, string>();
+    const buffers = discovery.getBuffers();
+    if (buffers) {
+      for (const [seriesId, markets] of buffers.entries()) {
+        const symbol = seriesToAsset[seriesId];
+        if (symbol) {
+          markets.forEach((m) => conditionToAsset.set(m.conditionId, symbol));
+        }
+      }
+    }
+    execution.setConditionToAssetMap(conditionToAsset);
+  };
+  updateMaps();
+
+  const monitoring = new MonitoringModule(
+    discovery,
+    priceHistory,
+    (state: MarketState) => {
+      execution.evaluate(state);
+    },
+  );
 
   // Resolve ordens filled assim que o mercado correspondente encerrar
   const resolvedIds = new Set<string>();
@@ -76,12 +114,22 @@ async function main() {
       if (market && market.marketEndDate > Date.now()) continue;
 
       // Tenta resolver — se retornar UNRESOLVED/UNKNOWN, tentaremos novamente no próximo ciclo
-      const record = await resolution.resolve(conditionId, market?.question ?? 'Unknown', order);
-      if (record.resolvedOutcome !== 'UNRESOLVED' && record.resolvedOutcome !== 'UNKNOWN') {
+      const record = await resolution.resolve(
+        conditionId,
+        market?.question ?? "Unknown",
+        order,
+      );
+      if (
+        record.resolvedOutcome !== "UNRESOLVED" &&
+        record.resolvedOutcome !== "UNKNOWN"
+      ) {
         resolvedIds.add(order.id);
       }
     }
-  }, 10_000); // 10s é suficiente para resolução sem pesar no log/API
+  }, 10_000);
+
+  // Monitora mudanças no Discovery para atualizar os mapas do Execution
+  setInterval(updateMaps, 30_000);
 
   monitoring.start();
 
@@ -96,18 +144,18 @@ async function main() {
   });
 
   const shutdown = () => {
-    logger.log('\n[Main] Encerrando...');
+    logger.log("\n[Main] Encerrando...");
     monitoring.stop();
     execution.cancelAll();
     unmount();
     process.exit(0);
   };
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
 main().catch((err) => {
-  logger.error('[Main] Fatal:', err);
+  logger.error("[Main] Fatal:", err);
   process.exit(1);
 });
