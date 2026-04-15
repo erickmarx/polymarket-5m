@@ -51,4 +51,9 @@ export interface TradeRecord {
 export type OrderStrategy = {
   shouldExecute: (state: MarketState) => boolean;
   getOrderPayload: (state: MarketState) => Omit<Order, 'id' | 'status' | 'createdAt'>;
+  shouldExit: (state: MarketState, currentPosition: Order) => boolean;
+  getExitPayload: (
+    state: MarketState,
+    currentPosition: Order,
+  ) => Omit<Order, 'id' | 'status' | 'createdAt'>;
 };

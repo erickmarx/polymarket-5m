@@ -14,10 +14,33 @@ export class ExecutionModule {
 
   evaluate(state: MarketState): void {
     if (!this.strategy) return;
-    if (this.activeByMarket.get(state.conditionId)) {
-      logger.debug(`[Execution] skip ${state.conditionId.slice(0, 8)}… — ordem já ativa`);
+
+    // Busca ordem FILLED ativa para este mercado para checar saída
+    const currentPosition = this.filledOrders.find(
+      (o) =>
+        o.status === "FILLED" &&
+        !o.id.includes("resolved") &&
+        this.isOrderForMarket(o, state),
+    );
+
+    if (currentPosition) {
+      if (this.strategy.shouldExit(state, currentPosition)) {
+        logger.log(`[Execution] Iniciando SAÍDA para ${state.conditionId.slice(0, 8)}…`);
+        const payload = this.strategy.getExitPayload(state, currentPosition);
+        // Marcamos a posição antiga como 'saindo' (hack simples usando prefixo)
+        currentPosition.id = `exiting-${currentPosition.id}`;
+        this.placeOrder(state.conditionId, payload);
+      }
       return;
     }
+
+    if (this.activeByMarket.get(state.conditionId)) {
+      logger.debug(
+        `[Execution] skip ${state.conditionId.slice(0, 8)}… — ordem já ativa`,
+      );
+      return;
+    }
+
     if (!this.strategy.shouldExecute(state)) {
       logger.debug(
         `[Execution] skip ${state.conditionId.slice(0, 8)}… — strategy=false` +
@@ -31,6 +54,11 @@ export class ExecutionModule {
     this.placeOrder(state.conditionId, payload);
   }
 
+  private isOrderForMarket(order: Order, state: MarketState): boolean {
+    return (
+      order.tokenId === state.upTokenId || order.tokenId === state.downTokenId
+    );
+  }
   private placeOrder(
     conditionId: string,
     payload: Omit<Order, 'id' | 'status' | 'createdAt'>,
