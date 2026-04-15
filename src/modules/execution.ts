@@ -1,7 +1,6 @@
 import { CONFIG } from "../config.ts";
 import { logger } from "../logger.ts";
 import type { MarketState, Order, OrderStrategy } from "../types.ts";
-import type { PriceHistoryModule } from "./price-history.ts";
 
 export class ExecutionModule {
   private activeOrders: Map<string, Order> = new Map();
