@@ -51,23 +51,39 @@ export class MonitoringModule {
   }
 
   private startRefreshCycle(): void {
-    // A cada 1s verifica se algum mercado expirou e re-subscribir se necessário
-    // discovery.refreshExpired agora cuida de não sobrecarregar API e só reportar 'changed' se o mercado ATIVO mudou.
     this.refreshTimer = setInterval(async () => {
+      const previousTokens = this.getAllTokenIds();
       const changed = await this.discovery.refreshExpired();
+
       if (changed) {
-        logger.log('[Monitoring] Mercados ativos mudaram — atualizando subscrições...');
         this.markets = this.discovery.getMarkets();
         this.tokenIndex = this.discovery.buildTokenIndex();
 
-        // Re-subscribir com novos tokens (fecha e reabre)
-        if (this.ws?.readyState === WebSocket.OPEN) {
-          this.ws.close();
+        const currentTokens = this.getAllTokenIds();
+        const hasTokenChanges =
+          previousTokens.length !== currentTokens.length ||
+          previousTokens.some((t, i) => t !== currentTokens[i]);
+
+        if (hasTokenChanges) {
+          logger.log(
+            "[Monitoring] Tokens ativos mudaram — atualizando subscrições...",
+          );
+          // Re-subscribir com novos tokens (fecha e reabre)
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.close();
+          }
         }
       }
     }, 1_000);
   }
 
+  private getAllTokenIds(): string[] {
+    const ids: string[] = [];
+    for (const m of this.markets.values()) {
+      ids.push(m.upTokenId, m.downTokenId);
+    }
+    return ids.sort();
+  }
   private connect(): void {
     if (this.markets.size === 0) {
       logger.log('[Monitoring] Nenhum mercado para monitorar');

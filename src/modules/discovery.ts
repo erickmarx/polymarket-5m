@@ -153,17 +153,26 @@ export class DiscoveryModule {
       const buffer = this.buffers.get(seriesId) ?? [];
       const active = buffer.filter((m) => m.marketEndDate > nowMs);
 
-      // Se o buffer mudou (algum mercado expirou), marcamos como potencial mudança
+      // Se o buffer mudou (algum mercado expirou), atualizamos
       if (active.length !== buffer.length) {
         this.buffers.set(seriesId, active);
-        // Não setamos 'changed' ainda, rebuildIndexes dirá se o mercado ATIVO mudou
       }
 
       // Renova se buffer está baixo (menos de 3 mercados futuros)
-      if (active.length <= 2) {
-        logger.log(
-          `[Discovery] série ${seriesId} — buffer baixo (${active.length}), renovando via API...`,
-        );
+      // OU se o mercado ATUAL está a menos de 60 segundos de acabar (proativo)
+      const current = active.find((m) => m.marketEndDate > nowMs);
+      const isExpiringSoon = current && current.marketEndDate - nowMs < 60_000;
+
+      if (active.length <= 2 || isExpiringSoon) {
+        if (active.length <= 2) {
+          logger.log(
+            `[Discovery] série ${seriesId} — buffer baixo (${active.length}), renovando via API...`,
+          );
+        } else {
+          logger.debug(
+            `[Discovery] série ${seriesId} — mercado atual expira em breve, antecipando fetch...`,
+          );
+        }
         await this.fetchSeries(seriesId);
       }
     }
