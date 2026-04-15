@@ -1,5 +1,6 @@
 export interface MarketState {
   conditionId: string;
+  seriesId: number;
   question: string;
   upTokenId: string;
   downTokenId: string;
@@ -58,6 +59,7 @@ export interface TradeRecord {
 }
 
 export type OrderStrategy = {
+  seriesIds: number[];
   shouldExecute: (state: MarketState, history: Candle[]) => boolean;
   getOrderPayload: (
     state: MarketState,

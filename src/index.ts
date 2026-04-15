@@ -14,7 +14,8 @@ const exampleStrategy: OrderStrategy = {
     // Exemplo: só entra se tivermos histórico completo e o preço caiu no último candle
     if (history.length < 2) return state.bestAskUp > 0 && state.bestAskUp < 0.45;
     const lastCandle = history[history.length - 1];
-    return state.bestAskUp > 0 && state.bestAskUp < 0.45 && lastCandle.close < lastCandle.open;
+    // logger.log(lastCandle.close, lastCandle.open)
+    return state.bestAskUp > 0 && state.bestAskUp < 0.45 
   },
   getOrderPayload(state: MarketState, _history: Candle[]) {
     return {
