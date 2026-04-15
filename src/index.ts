@@ -20,7 +20,7 @@ async function main() {
   const execution = new ExecutionModule();
   const resolution = new ResolutionHandler();
 
-  execution.registerStrategy(exampleStrategy);
+  strategies.forEach((s) => execution.registerStrategy(s));
 
   // 1. Carrega mercados do Polymarket
   await discovery.fetchAllSeries();

@@ -3,6 +3,7 @@
 ## Objetivo
 O **Polymarket 5M Monitor** é um bot de trading de alta frequência (HFT) especializado nos mercados de previsão de 5 minutos da Polymarket (Up/Down). Ele monitora múltiplos ativos em paralelo, analisa o histórico de preços e executa estratégias de entrada e saída baseadas em indicadores técnicos.
 
+**Qualidade de Código:** Pipeline integrado de `lint` (ESLint), `format` (Prettier) e `build` (TypeScript check), resolva erros e warning.
 ## Arquitetura Atual
 
 ### 1. Monitoramento Paralelo
@@ -22,7 +23,6 @@ O **Polymarket 5M Monitor** é um bot de trading de alta frequência (HFT) espec
 - **Ambiente:** Desenvolvido em **Bun** para máxima performance em I/O (WebSockets).
 - **Interface:** Dashboard CLI interativo construído com **Ink (React)**.
 - **Padrão de Desenvolvimento:** Toda e qualquer alteração no código **deve** ser validada obrigatoriamente através dos comandos de `build`, `lint` e `format`, e deve ser **comitada imediatamente** após a validação bem-sucedida.
-- **Qualidade de Código:** Pipeline integrado de `lint` (ESLint), `format` (Prettier) e `build` (TypeScript check).
 
 ## Roadmap / Próximos Passos
 - Implementar indicadores técnicos (RSI, Médias Móveis, Bandas de Bollinger) no módulo de histórico.

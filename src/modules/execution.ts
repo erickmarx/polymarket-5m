@@ -8,6 +8,8 @@ export class ExecutionModule {
   private strategies: OrderStrategy[] = [];
   private conditionToAsset: Map<string, string> = new Map();
 
+  constructor(private priceHistory: PriceHistoryModule) {}
+
   registerStrategy(strategy: OrderStrategy): void {
     this.strategies.push(strategy);
   }
