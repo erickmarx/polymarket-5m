@@ -52,11 +52,11 @@ function MarketRow({ market }: { market: MarketState }) {
 }
 
 function OrderRow({ order }: { order: Order }) {
-  const color =
-    order.status === 'FILLED' ? 'green' : order.status === 'CANCELLED' ? 'red' : 'yellow';
+  const color = order.status === 'FILLED' ? 'green' : order.status === 'CANCELLED' ? 'red' : 'yellow';
   return (
     <Box>
       <Text color={color}>{order.status.padEnd(10)}</Text>
+      <Text color="magenta">[{order.strategyId.slice(0, 8)}] </Text>
       <Text>{order.side.padEnd(5)}</Text>
       <Text>size: {order.size.toFixed(2).padEnd(8)}</Text>
       <Text>@ {order.price.toFixed(4)}</Text>
