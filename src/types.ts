@@ -13,17 +13,19 @@ export interface MarketState {
 
 // Resposta de GET /events?series_id=...
 export interface GammaEvent {
-  id: string;          // usado como conditionId
+  id: string; // usado como conditionId
   title: string;
   startTime: string;
   endDate: string;
   volume24hr?: number;
-  markets: [{
-    outcomes: string;       // JSON string: ["Yes","No"] ou ["Up","Down"]
-    clobTokenIds: string;   // JSON string: ["tokenA","tokenB"]
-    acceptingOrders: boolean;
-    volume24hr?: number;
-  }];
+  markets: [
+    {
+      outcomes: string; // JSON string: ["Yes","No"] ou ["Up","Down"]
+      clobTokenIds: string; // JSON string: ["tokenA","tokenB"]
+      acceptingOrders: boolean;
+      volume24hr?: number;
+    },
+  ];
 }
 
 export interface Order {

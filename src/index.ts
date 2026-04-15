@@ -39,31 +39,28 @@ async function main() {
     process.exit(1);
   }
 
-  const monitoring = new MonitoringModule(
-    discovery,
-    (state: MarketState) => {
-      execution.evaluate(state);
-    },
-  );
+  const monitoring = new MonitoringModule(discovery, (state: MarketState) => {
+    execution.evaluate(state);
+  });
 
   // Resolve ordens filled assim que o mercado correspondente encerrar
   const resolvedIds = new Set<string>();
   setInterval(async () => {
     const markets = discovery.getMarkets();
     const tokenIndex = discovery.buildTokenIndex();
-    
+
     for (const order of execution.getFilledOrders()) {
       if (resolvedIds.has(order.id)) continue;
-      
+
       const conditionId = tokenIndex.get(order.tokenId);
       if (!conditionId) continue;
-      
+
       const market = markets.get(conditionId);
       // Se o mercado ainda está no Discovery, esperamos ele expirar para tentar resolver
       if (market && market.marketEndDate > Date.now()) continue;
 
       // Tenta resolver — se retornar UNRESOLVED/UNKNOWN, tentaremos novamente no próximo ciclo
-      const record = await resolution.resolve(conditionId, market?.question ?? "Unknown", order);
+      const record = await resolution.resolve(conditionId, market?.question ?? 'Unknown', order);
       if (record.resolvedOutcome !== 'UNRESOLVED' && record.resolvedOutcome !== 'UNKNOWN') {
         resolvedIds.add(order.id);
       }
@@ -94,7 +91,7 @@ async function main() {
   process.on('SIGTERM', shutdown);
 }
 
-main().catch(err => {
+main().catch((err) => {
   logger.error('[Main] Fatal:', err);
   process.exit(1);
 });

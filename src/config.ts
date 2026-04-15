@@ -20,8 +20,8 @@ export const CONFIG = {
     // Até 8 seriesIds de cripto para monitorar em paralelo (imutáveis entre mercados)
     seriesIds: (process.env.SERIES_IDS ?? '10684,10685,10686')
       .split(',')
-      .map(s => parseInt(s.trim(), 10))
-      .filter(n => !isNaN(n))
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n))
       .slice(0, 8),
   },
 };

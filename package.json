@@ -5,10 +5,20 @@
   "private": true,
   "scripts": {
     "start": "bun run src/index.ts",
-    "dev": "bun --watch src/index.ts"
+    "dev": "bun --watch src/index.ts",
+    "dashboard": "bun src/ui/cli.tsx",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "lint": "bun x eslint src/**",
+    "format": "bun x prettier --write src/**"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@eslint/js": "^10.0.1",
+    "@types/bun": "latest",
+    "eslint": "^10.2.0",
+    "eslint-plugin-react": "^7.37.5",
+    "prettier": "^3.8.3",
+    "react-devtools-core": "^7.0.1",
+    "typescript-eslint": "^8.58.2"
   },
   "peerDependencies": {
     "typescript": "^5"

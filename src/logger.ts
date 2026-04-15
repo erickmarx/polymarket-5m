@@ -1,9 +1,7 @@
 import { CONFIG } from './config.ts';
 import { appendFileSync, mkdirSync } from 'node:fs';
 
-const logFile = CONFIG.debug
-  ? `logs/${new Date().toISOString().slice(0, 10)}-run.log`
-  : null;
+const logFile = CONFIG.debug ? `logs/${new Date().toISOString().slice(0, 10)}-run.log` : null;
 
 if (logFile) {
   mkdirSync('logs', { recursive: true });
@@ -12,7 +10,7 @@ if (logFile) {
 function fmt(level: string, args: unknown[]): string {
   const ts = new Date().toISOString();
   const msg = args
-    .map(a => (typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)))
+    .map((a) => (typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)))
     .join(' ');
   return `${ts} [${level}] ${msg}`;
 }

@@ -21,8 +21,8 @@ export class ExecutionModule {
     if (!this.strategy.shouldExecute(state)) {
       logger.debug(
         `[Execution] skip ${state.conditionId.slice(0, 8)}… — strategy=false` +
-        ` bidUp=${state.bestBidUp} askUp=${state.bestAskUp}` +
-        ` bidDown=${state.bestBidDown} askDown=${state.bestAskDown}`,
+          ` bidUp=${state.bestBidUp} askUp=${state.bestAskUp}` +
+          ` bidDown=${state.bestBidDown} askDown=${state.bestAskDown}`,
       );
       return;
     }
@@ -92,7 +92,7 @@ export class ExecutionModule {
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const data = await response.json() as { orderID?: string };
+      const data = (await response.json()) as { orderID?: string };
       const remoteId = data.orderID ?? order.id;
       logger.log(`[Execution][Live] Ordem enviada: ${remoteId}`);
       this.pollOrderStatus(conditionId, order, remoteId);
@@ -122,7 +122,7 @@ export class ExecutionModule {
 
         if (!response.ok) return;
 
-        const data = await response.json() as { status?: string };
+        const data = (await response.json()) as { status?: string };
         const status = data.status;
 
         if (status === 'FILLED' || status === 'MATCHED') {

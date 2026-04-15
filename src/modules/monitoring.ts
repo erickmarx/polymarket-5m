@@ -42,7 +42,10 @@ export class MonitoringModule {
   stop(): void {
     this.isRunning = false;
     this.clearHeartbeat();
-    if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null; }
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
     this.ws?.close();
     this.ws = null;
   }
@@ -56,7 +59,7 @@ export class MonitoringModule {
         logger.log('[Monitoring] Mercados ativos mudaram — atualizando subscrições...');
         this.markets = this.discovery.getMarkets();
         this.tokenIndex = this.discovery.buildTokenIndex();
-        
+
         // Re-subscribir com novos tokens (fecha e reabre)
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.close();
@@ -110,7 +113,9 @@ export class MonitoringModule {
     };
 
     this.ws?.send(JSON.stringify(payload));
-    logger.log(`[Monitoring] Subscrito a ${this.markets.size} mercados (${allTokenIds.length} tokens)`);
+    logger.log(
+      `[Monitoring] Subscrito a ${this.markets.size} mercados (${allTokenIds.length} tokens)`,
+    );
   }
 
   private handleMessage(raw: string): void {
@@ -126,7 +131,7 @@ export class MonitoringModule {
       // frames não-JSON — ignorar
     }
   }
-  
+
   private applyPriceChange(msg: WsPriceChange): void {
     const conditionId = this.tokenIndex.get(msg.asset_id);
     if (!conditionId) {
@@ -151,7 +156,9 @@ export class MonitoringModule {
 
     market.updatedAt = Date.now();
 
-    logger.debug(`[Monitoring] ${conditionId.slice(0, 8)}… ${isUp ? 'UP' : 'DOWN'} bid=${bid} ask=${ask}`);
+    logger.debug(
+      `[Monitoring] ${conditionId.slice(0, 8)}… ${isUp ? 'UP' : 'DOWN'} bid=${bid} ask=${ask}`,
+    );
 
     this.onPriceChange(market);
   }
@@ -175,9 +182,12 @@ export class MonitoringModule {
   getConnectionStatus(): 'connected' | 'disconnected' | 'connecting' {
     if (!this.ws) return 'disconnected';
     switch (this.ws.readyState) {
-      case WebSocket.OPEN: return 'connected';
-      case WebSocket.CONNECTING: return 'connecting';
-      default: return 'disconnected';
+      case WebSocket.OPEN:
+        return 'connected';
+      case WebSocket.CONNECTING:
+        return 'connecting';
+      default:
+        return 'disconnected';
     }
   }
 }
