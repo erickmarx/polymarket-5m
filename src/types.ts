@@ -28,13 +28,22 @@ export interface GammaEvent {
   ];
 }
 
+export interface Candle {
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  timestamp: number;
+}
+
 export interface Order {
   id: string;
   tokenId: string;
-  side: 'BUY' | 'SELL';
+  side: "BUY" | "SELL";
   size: number;
   price: number;
-  status: 'PENDING' | 'LIVE' | 'FILLED' | 'CANCELLED';
+  status: "PENDING" | "LIVE" | "FILLED" | "CANCELLED";
   createdAt: number;
   filledAt?: number;
 }
@@ -49,11 +58,19 @@ export interface TradeRecord {
 }
 
 export type OrderStrategy = {
-  shouldExecute: (state: MarketState) => boolean;
-  getOrderPayload: (state: MarketState) => Omit<Order, 'id' | 'status' | 'createdAt'>;
-  shouldExit: (state: MarketState, currentPosition: Order) => boolean;
+  shouldExecute: (state: MarketState, history: Candle[]) => boolean;
+  getOrderPayload: (
+    state: MarketState,
+    history: Candle[],
+  ) => Omit<Order, "id" | "status" | "createdAt">;
+  shouldExit: (
+    state: MarketState,
+    currentPosition: Order,
+    history: Candle[],
+  ) => boolean;
   getExitPayload: (
     state: MarketState,
     currentPosition: Order,
-  ) => Omit<Order, 'id' | 'status' | 'createdAt'>;
+    history: Candle[],
+  ) => Omit<Order, "id" | "status" | "createdAt">;
 };

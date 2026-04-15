@@ -18,10 +18,23 @@ export const CONFIG = {
   monitoring: {
     heartbeatIntervalMs: 30_000,
     // Até 8 seriesIds de cripto para monitorar em paralelo (imutáveis entre mercados)
-    seriesIds: (process.env.SERIES_IDS ?? '10684,10685,10686')
-      .split(',')
+    seriesIds: (process.env.SERIES_IDS ?? "10684,10685,10686")
+      .split(",")
       .map((s) => parseInt(s.trim(), 10))
       .filter((n) => !isNaN(n))
       .slice(0, 8),
+    // Mapeamento de seriesId para símbolo Binance (ex: 10684 -> BTCUSDT)
+    seriesToAssetMap: ((): Record<number, string> => {
+      const ids = (process.env.SERIES_IDS ?? "10684,10685,10686").split(",");
+      const assets = (process.env.ASSETS ?? "BTCUSDT,ETHUSDT,SOLUSDT").split(",");
+      const map: Record<number, string> = {};
+      ids.forEach((id, i) => {
+        const numId = parseInt(id.trim(), 10);
+        if (!isNaN(numId)) {
+          map[numId] = (assets[i] || assets[0]).trim().toUpperCase();
+        }
+      });
+      return map;
+    })(),
   },
 };
