@@ -1,6 +1,7 @@
 import { CONFIG } from "../config.ts";
 import { logger } from "../logger.ts";
 import type { MarketState, Order, OrderStrategy } from "../types.ts";
+import type { PriceHistoryModule } from "./price-history.ts";
 
 export class ExecutionModule {
   private activeOrders: Map<string, Order> = new Map();
@@ -12,6 +13,10 @@ export class ExecutionModule {
 
   registerStrategy(strategy: OrderStrategy): void {
     this.strategies.push(strategy);
+  }
+
+  setConditionToAssetMap(map: Map<string, string>): void {
+    this.conditionToAsset = map;
   }
 
   evaluate(state: MarketState): void {
@@ -36,10 +41,9 @@ export class ExecutionModule {
             `[Execution] ${strategy.id}: Iniciando SAÍDA para ${state.conditionId.slice(0, 8)}…`,
           );
           const payload = strategy.getExitPayload(state, currentPosition, history);
-          const order = this.createOrder(state.conditionId, strategy.id, payload);
           // Marcamos a posição antiga como 'saindo'
           currentPosition.id = `exiting-${currentPosition.id}`;
-          this.dispatchOrder(state.conditionId, order);
+          this.dispatchOrder(state.conditionId, payload, strategy.id);
         }
         continue;
       }
@@ -49,8 +53,7 @@ export class ExecutionModule {
           `[Execution] ${strategy.id}: Iniciando ENTRADA para ${state.conditionId.slice(0, 8)}…`,
         );
         const payload = strategy.getOrderPayload(state, history);
-        const order = this.createOrder(state.conditionId, strategy.id, payload);
-        this.dispatchOrder(state.conditionId, order);
+        this.dispatchOrder(state.conditionId, payload, strategy.id);
       }
     }
   }
@@ -69,7 +72,12 @@ export class ExecutionModule {
     };
   }
 
-  private dispatchOrder(conditionId: string, order: Order): void {
+  private dispatchOrder(
+    conditionId: string,
+    payload: Omit<Order, "id" | "status" | "createdAt" | "strategyId">,
+    strategyId: string,
+  ): void {
+    const order = this.createOrder(conditionId, strategyId, payload);
     if (CONFIG.trading.mode === "dryrun") {
       this.executeDryRun(conditionId, order);
     } else {
@@ -81,26 +89,6 @@ export class ExecutionModule {
     return (
       order.tokenId === state.upTokenId || order.tokenId === state.downTokenId
     );
-  }
-
-  private placeOrder(
-    conditionId: string,
-    payload: Omit<Order, "id" | "status" | "createdAt">,
-  ): void {
-    const order: Order = {
-      ...payload,
-      id: crypto.randomUUID(),
-      status: "PENDING",
-      createdAt: Date.now(),
-    };
-
-    this.activeByMarket.set(conditionId, true);
-
-    if (CONFIG.trading.mode === "dryrun") {
-      this.executeDryRun(conditionId, order);
-    } else {
-      this.executeLive(conditionId, order);
-    }
   }
 
   private executeDryRun(conditionId: string, order: Order): void {
@@ -115,7 +103,6 @@ export class ExecutionModule {
       order.filledAt = Date.now();
       this.activeOrders.delete(order.id);
       this.filledOrders.push(order);
-      this.activeByMarket.set(conditionId, false);
       logger.log(`[Execution][DryRun] FILLED ${order.id}`);
     }, 2_000);
   }
@@ -147,21 +134,16 @@ export class ExecutionModule {
       const data = (await response.json()) as { orderID?: string };
       const remoteId = data.orderID ?? order.id;
       logger.log(`[Execution][Live] Ordem enviada: ${remoteId}`);
-      this.pollOrderStatus(conditionId, order, remoteId);
+      this.pollOrderStatus(order, remoteId);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error(`[Execution][Live] Falha: ${message}`);
       order.status = "CANCELLED";
       this.activeOrders.delete(order.id);
-      this.activeByMarket.set(conditionId, false);
     }
   }
 
-  private async pollOrderStatus(
-    conditionId: string,
-    order: Order,
-    remoteId: string,
-  ): Promise<void> {
+  private async pollOrderStatus(order: Order, remoteId: string): Promise<void> {
     const interval = setInterval(async () => {
       try {
         const response = await fetch(
@@ -186,13 +168,11 @@ export class ExecutionModule {
           order.filledAt = Date.now();
           this.activeOrders.delete(order.id);
           this.filledOrders.push(order);
-          this.activeByMarket.set(conditionId, false);
           logger.log(`[Execution][Live] FILLED: ${remoteId}`);
         } else if (status === "CANCELLED" || status === "REJECTED") {
           clearInterval(interval);
           order.status = "CANCELLED";
           this.activeOrders.delete(order.id);
-          this.activeByMarket.set(conditionId, false);
           logger.log(`[Execution][Live] ${status}: ${remoteId}`);
         }
       } catch (err: unknown) {
@@ -215,6 +195,5 @@ export class ExecutionModule {
       order.status = "CANCELLED";
     }
     this.activeOrders.clear();
-    this.activeByMarket.clear();
   }
 }
