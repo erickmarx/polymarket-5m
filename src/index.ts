@@ -6,45 +6,8 @@ import { ResolutionHandler } from "./modules/resolution.ts";
 import { PriceHistoryModule } from "./modules/price-history.ts";
 import { startDashboard } from "./ui/cli.tsx";
 import { CONFIG } from "./config.ts";
-import type { MarketState, Order, OrderStrategy, Candle } from "./types.ts";
-
-// ─── Estratégia de exemplo: compra UP se ask < 0.45 ──────────────────────────
-const exampleStrategy: OrderStrategy = {
-  shouldExecute(state: MarketState, history: Candle[]): boolean {
-    // Exemplo: só entra se tivermos histórico completo e o preço caiu no último candle
-    if (history.length < 2) return state.bestAskUp > 0 && state.bestAskUp < 0.45;
-    const lastCandle = history[history.length - 1];
-    return state.bestAskUp > 0 && state.bestAskUp < 0.45 && lastCandle.close < lastCandle.open;
-  },
-  getOrderPayload(state: MarketState, _history: Candle[]) {
-    return {
-      tokenId: state.upTokenId,
-      side: "BUY" as const,
-      size: 10,
-      price: state.bestAskUp,
-    };
-  },
-  shouldExit(state: MarketState, currentPosition: Order, _history: Candle[]): boolean {
-    const currentPrice =
-      currentPosition.tokenId === state.upTokenId
-        ? state.bestBidUp
-        : state.bestBidDown;
-    if (currentPrice === 0) return false;
-    const pnl = currentPrice - currentPosition.price;
-    return pnl > 0.05 || pnl < -0.02;
-  },
-  getExitPayload(state: MarketState, currentPosition: Order, _history: Candle[]) {
-    return {
-      tokenId: currentPosition.tokenId,
-      side: "SELL" as const,
-      size: currentPosition.size,
-      price:
-        currentPosition.tokenId === state.upTokenId
-          ? state.bestBidUp
-          : state.bestBidDown,
-    };
-  },
-};
+import type { MarketState, Candle } from "./types.ts";
+import { exampleStrategy } from "./strategies/example.ts";
 
 async function main() {
   logger.log(
