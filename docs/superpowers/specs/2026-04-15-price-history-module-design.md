@@ -25,9 +25,9 @@ The `PriceHistoryModule` serves as a high-frequency data warehouse for the tradi
 
 ### 3.1 Bootstrap (Initialization)
 1. For each `seriesId` in configuration:
-   - Identify the underlying asset (e.g., BTCUSDT).
+   - Identify the pre-defined underlying asset (e.g., `btcusdt` for Bitcoin series) from `CONFIG.monitoring.seriesToAssetMap`.
    - Fetch the last 50 candles from Binance: `GET https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=50`.
-   - Store in `histories` map.
+   - Store in `histories` map using the asset symbol as key.
    - Initialize the `currentCandle` for the active interval.
 
 ### 3.2 Real-time Streaming
