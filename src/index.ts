@@ -5,7 +5,7 @@ import { ExecutionModule } from './modules/execution.ts';
 import { ResolutionHandler } from './modules/resolution.ts';
 import { startDashboard } from './ui/cli.tsx';
 import { CONFIG } from './config.ts';
-import type { MarketState, OrderStrategy } from './types.ts';
+import type { MarketState, Order, OrderStrategy } from './types.ts';
 
 // ─── Estratégia de exemplo: compra UP se ask < 0.45 ──────────────────────────
 const exampleStrategy: OrderStrategy = {
@@ -15,7 +15,7 @@ const exampleStrategy: OrderStrategy = {
   getOrderPayload(state: MarketState) {
     return {
       tokenId: state.upTokenId,
-      side: "BUY" as const,
+      side: 'BUY' as const,
       size: 10,
       price: state.bestAskUp,
     };
@@ -23,9 +23,7 @@ const exampleStrategy: OrderStrategy = {
   shouldExit(state: MarketState, currentPosition: Order): boolean {
     // Exemplo: sai se tiver lucro de 5% ou prejuízo de 2%
     const currentPrice =
-      currentPosition.tokenId === state.upTokenId
-        ? state.bestBidUp
-        : state.bestBidDown;
+      currentPosition.tokenId === state.upTokenId ? state.bestBidUp : state.bestBidDown;
     if (currentPrice === 0) return false;
     const pnl = currentPrice - currentPosition.price;
     return pnl > 0.05 || pnl < -0.02;
@@ -33,12 +31,9 @@ const exampleStrategy: OrderStrategy = {
   getExitPayload(state: MarketState, currentPosition: Order) {
     return {
       tokenId: currentPosition.tokenId,
-      side: "SELL" as const,
+      side: 'SELL' as const,
       size: currentPosition.size,
-      price:
-        currentPosition.tokenId === state.upTokenId
-          ? state.bestBidUp
-          : state.bestBidDown,
+      price: currentPosition.tokenId === state.upTokenId ? state.bestBidUp : state.bestBidDown,
     };
   },
 };
