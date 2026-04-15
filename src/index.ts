@@ -17,12 +17,10 @@ async function main() {
 
   const discovery = new DiscoveryModule();
   const priceHistory = new PriceHistoryModule();
-  const execution = new ExecutionModule(priceHistory);
+  const execution = new ExecutionModule();
   const resolution = new ResolutionHandler();
 
-  for (const strategy of strategies) {
-    execution.setStrategy(strategy);
-  }
+  execution.registerStrategy(exampleStrategy);
 
   // 1. Carrega mercados do Polymarket
   await discovery.fetchAllSeries();
