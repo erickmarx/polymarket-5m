@@ -21,6 +21,7 @@ O **Polymarket 5M Monitor** é um bot de trading de alta frequência (HFT) espec
 ### 4. Execução e Qualidade
 - **Ambiente:** Desenvolvido em **Bun** para máxima performance em I/O (WebSockets).
 - **Interface:** Dashboard CLI interativo construído com **Ink (React)**.
+- **Padrão de Desenvolvimento:** Toda e qualquer alteração no código **deve** ser validada obrigatoriamente através dos comandos de `build`, `lint` e `format`, e deve ser **comitada imediatamente** após a validação bem-sucedida.
 - **Qualidade de Código:** Pipeline integrado de `lint` (ESLint), `format` (Prettier) e `build` (TypeScript check).
 
 ## Roadmap / Próximos Passos
