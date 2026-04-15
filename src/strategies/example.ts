@@ -1,6 +1,7 @@
 import type { MarketState, Order, OrderStrategy, Candle } from "../types.ts";
 
 export const exampleStrategy: OrderStrategy = {
+  id: "example-rsi-strat",
   seriesIds: [10684, 10685, 10686], // Exemplo de séries alvo
   shouldExecute(state: MarketState, history: Candle[]): boolean {
     if (history.length < 2) return state.bestAskUp > 0 && state.bestAskUp < 0.45;

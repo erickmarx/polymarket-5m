@@ -6,73 +6,74 @@ import type { PriceHistoryModule } from "./price-history.ts";
 export class ExecutionModule {
   private activeOrders: Map<string, Order> = new Map();
   private filledOrders: Order[] = [];
-  private strategy: OrderStrategy | null = null;
-  private activeByMarket: Map<string, boolean> = new Map();
-  // Mapeamento de conditionId para assetSymbol (populado pelo index.ts)
+  private strategies: OrderStrategy[] = [];
   private conditionToAsset: Map<string, string> = new Map();
 
-  constructor(private priceHistory: PriceHistoryModule) {}
-
-  setStrategy(strategy: OrderStrategy): void {
-    this.strategy = strategy;
-  }
-
-  setConditionToAssetMap(map: Map<string, string>): void {
-    this.conditionToAsset = map;
+  registerStrategy(strategy: OrderStrategy): void {
+    this.strategies.push(strategy);
   }
 
   evaluate(state: MarketState): void {
-    if (!this.strategy) return;
-
     const symbol = this.conditionToAsset.get(state.conditionId);
-    if (!symbol) {
-      logger.debug(
-        `[Execution] Símbolo não encontrado para mercado ${state.conditionId.slice(0, 8)}…`,
-      );
-      return;
-    }
-
+    if (!symbol) return;
     const history = this.priceHistory.getHistory(symbol);
 
-    // Busca ordem FILLED ativa para este mercado para checar saída
-    const currentPosition = this.filledOrders.find(
-      (o) =>
-        o.status === "FILLED" &&
-        !o.id.includes("resolved") &&
-        this.isOrderForMarket(o, state),
-    );
+    for (const strategy of this.strategies) {
+      if (!strategy.seriesIds.includes(state.seriesId)) continue;
 
-    if (currentPosition) {
-      if (this.strategy.shouldExit(state, currentPosition, history)) {
-        logger.log(
-          `[Execution] Iniciando SAÍDA para ${state.conditionId.slice(0, 8)}…`,
-        );
-        const payload = this.strategy.getExitPayload(state, currentPosition, history);
-        // Marcamos a posição antiga como 'saindo' (hack simples usando prefixo)
-        currentPosition.id = `exiting-${currentPosition.id}`;
-        this.placeOrder(state.conditionId, payload);
+      // Busca ordem FILLED ativa para este mercado E estratégia
+      const currentPosition = this.filledOrders.find(
+        (o) =>
+          o.status === "FILLED" &&
+          o.strategyId === strategy.id &&
+          this.isOrderForMarket(o, state),
+      );
+
+      if (currentPosition) {
+        if (strategy.shouldExit(state, currentPosition, history)) {
+          logger.log(
+            `[Execution] ${strategy.id}: Iniciando SAÍDA para ${state.conditionId.slice(0, 8)}…`,
+          );
+          const payload = strategy.getExitPayload(state, currentPosition, history);
+          const order = this.createOrder(state.conditionId, strategy.id, payload);
+          // Marcamos a posição antiga como 'saindo'
+          currentPosition.id = `exiting-${currentPosition.id}`;
+          this.dispatchOrder(state.conditionId, order);
+        }
+        continue;
       }
-      return;
-    }
 
-    if (this.activeByMarket.get(state.conditionId)) {
-      logger.debug(
-        `[Execution] skip ${state.conditionId.slice(0, 8)}… — ordem já ativa`,
-      );
-      return;
+      if (strategy.shouldExecute(state, history)) {
+        logger.log(
+          `[Execution] ${strategy.id}: Iniciando ENTRADA para ${state.conditionId.slice(0, 8)}…`,
+        );
+        const payload = strategy.getOrderPayload(state, history);
+        const order = this.createOrder(state.conditionId, strategy.id, payload);
+        this.dispatchOrder(state.conditionId, order);
+      }
     }
+  }
 
-    if (!this.strategy.shouldExecute(state, history)) {
-      logger.debug(
-        `[Execution] skip ${state.conditionId.slice(0, 8)}… — strategy=false` +
-          ` bidUp=${state.bestBidUp} askUp=${state.bestAskUp}` +
-          ` bidDown=${state.bestBidDown} askDown=${state.bestAskDown}`,
-      );
-      return;
+  private createOrder(
+    conditionId: string,
+    strategyId: string,
+    payload: Omit<Order, "id" | "status" | "createdAt" | "strategyId">,
+  ): Order {
+    return {
+      ...payload,
+      strategyId,
+      id: crypto.randomUUID(),
+      status: "PENDING",
+      createdAt: Date.now(),
+    };
+  }
+
+  private dispatchOrder(conditionId: string, order: Order): void {
+    if (CONFIG.trading.mode === "dryrun") {
+      this.executeDryRun(conditionId, order);
+    } else {
+      this.executeLive(conditionId, order);
     }
-
-    const payload = this.strategy.getOrderPayload(state, history);
-    this.placeOrder(state.conditionId, payload);
   }
 
   private isOrderForMarket(order: Order, state: MarketState): boolean {
