@@ -8,8 +8,9 @@ import { ApiModule } from './modules/api.ts';
 import { CONFIG } from './config.ts';
 import type { MarketState } from './types.ts';
 import { exampleStrategy } from './strategies/example.ts';
+import { polymarketSignalStrategy } from './strategies/polymarket-signal.ts';
 
-const strategies = [exampleStrategy];
+const strategies = [exampleStrategy, polymarketSignalStrategy];
 
 async function main() {
   logger.log(`[Main] Iniciando Polymarket 5M Monitor Headless (mode: ${CONFIG.trading.mode})`);
