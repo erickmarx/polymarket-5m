@@ -15,6 +15,10 @@ export class ExecutionModule {
     this.statusManager = new StrategyStatusManager();
   }
 
+  getStatusManager(): StrategyStatusManager {
+    return this.statusManager;
+  }
+
   registerStrategy(strategy: OrderStrategy): void {
     this.strategies.push(strategy);
   }

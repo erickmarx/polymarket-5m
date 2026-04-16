@@ -4,7 +4,7 @@ import { MonitoringModule } from './modules/monitoring.ts';
 import { ExecutionModule } from './modules/execution.ts';
 import { ResolutionHandler } from './modules/resolution.ts';
 import { PriceHistoryModule } from './modules/price-history.ts';
-import { startDashboard } from './ui/cli.tsx';
+import { ApiModule } from './modules/api.ts';
 import { CONFIG } from './config.ts';
 import type { MarketState } from './types.ts';
 import { exampleStrategy } from './strategies/example.ts';
@@ -12,13 +12,13 @@ import { exampleStrategy } from './strategies/example.ts';
 const strategies = [exampleStrategy];
 
 async function main() {
-  logger.log(`[Main] Iniciando Polymarket 5M Monitor (mode: ${CONFIG.trading.mode})`);
-  logger.log(`[Main] Séries configuradas: ${CONFIG.monitoring.seriesIds.length}`);
+  logger.log(`[Main] Iniciando Polymarket 5M Monitor Headless (mode: ${CONFIG.trading.mode})`);
 
   const discovery = new DiscoveryModule();
   const priceHistory = new PriceHistoryModule();
-  const execution = new ExecutionModule();
+  const execution = new ExecutionModule(priceHistory);
   const resolution = new ResolutionHandler();
+  const api = new ApiModule(discovery, execution, execution.getStatusManager());
 
   strategies.forEach((s) => execution.registerStrategy(s));
 
@@ -52,7 +52,11 @@ async function main() {
 
   const monitoring = new MonitoringModule(discovery, priceHistory, (state: MarketState) => {
     execution.evaluate(state);
+    api.broadcastMarketUpdate(state);
   });
+
+  // 4. Inicia API
+  api.start();
 
   // Resolve ordens filled assim que o mercado correspondente encerrar
   const resolvedIds = new Set<string>();
@@ -83,21 +87,10 @@ async function main() {
 
   monitoring.start();
 
-  const unmount = startDashboard({
-    getMarkets: () => discovery.getMarkets(),
-    getConnectionStatus: () => monitoring.getConnectionStatus(),
-    getActiveOrders: () => execution.getActiveOrders(),
-    getFilledOrders: () => execution.getFilledOrders(),
-    getHistory: () => resolution.getHistory(),
-    getTotalPnL: () => resolution.getTotalPnL(),
-    mode: CONFIG.trading.mode,
-  });
-
   const shutdown = () => {
     logger.log('\n[Main] Encerrando...');
     monitoring.stop();
     execution.cancelAll();
-    unmount();
     process.exit(0);
   };
 
