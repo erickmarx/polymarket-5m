@@ -45,7 +45,7 @@ Bi-directional communication over WebSockets (`ws://localhost:8080`):
     - Update to allow "subscriptions" or an event emitter so `api.ts` can broadcast logs.
 - **`src/index.ts`**: Remove terminal UI (`startDashboard`) and initialize the API server instead.
 
-### Frontend (src/web)
+### Frontend (web)
 - **Framework**: React + Vite + Tailwind CSS.
 - **State Management**: Simple React Context or a lightweight store like Zustand.
 - **Connection Management**:
