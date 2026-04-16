@@ -1,5 +1,8 @@
 {
   "test-strat": {
     "active": true
+  },
+  "example-test-strat": {
+    "active": false
   }
 }

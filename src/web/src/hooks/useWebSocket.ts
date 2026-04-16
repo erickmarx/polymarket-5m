@@ -19,8 +19,8 @@ export function useWebSocket() {
   const ws = useRef<WebSocket | null>(null);
 
   const connect = useCallback(() => {
-    // No ambiente local, usamos a porta 8080 do backend
-    const socket = new WebSocket('ws://localhost:8080');
+    // No ambiente local, usamos a porta 8090 do backend
+    const socket = new WebSocket('ws://localhost:8090');
     ws.current = socket;
 
     socket.onopen = () => {

@@ -10,7 +10,7 @@ interface ServerWebSocketData {
 
 export class ApiModule {
   private clients: Set<any> = new Set();
-  private port = 8080;
+  private port = 8090;
 
   constructor(
     private discovery: DiscoveryModule,

@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/ws': {
-        target: 'ws://localhost:8080',
+        target: 'ws://localhost:8090',
         ws: true,
       },
     },

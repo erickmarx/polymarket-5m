@@ -62,19 +62,26 @@ export interface TradeRecord {
 export type OrderStrategy = {
   id: string;
   seriesIds: number[];
-  shouldExecute: (state: MarketState, history: Candle[]) => boolean;
+  shouldExecute: (
+    state: MarketState,
+    history: Candle[],
+  ) => boolean | Promise<boolean>;
   getOrderPayload: (
     state: MarketState,
     history: Candle[],
-  ) => Omit<Order, "id" | "status" | "createdAt" | "strategyId">;
+  ) =>
+    | Omit<Order, "id" | "status" | "createdAt" | "strategyId">
+    | Promise<Omit<Order, "id" | "status" | "createdAt" | "strategyId">>;
   shouldExit: (
     state: MarketState,
     currentPosition: Order,
     history: Candle[],
-  ) => boolean;
+  ) => boolean | Promise<boolean>;
   getExitPayload: (
     state: MarketState,
     currentPosition: Order,
     history: Candle[],
-  ) => Omit<Order, "id" | "status" | "createdAt" | "strategyId">;
+  ) =>
+    | Omit<Order, "id" | "status" | "createdAt" | "strategyId">
+    | Promise<Omit<Order, "id" | "status" | "createdAt" | "strategyId">>;
 };

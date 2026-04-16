@@ -1,6 +1,6 @@
-import { CONFIG } from "../config.ts";
-import { logger } from "../logger.ts";
-import type { Candle } from "../types.ts";
+import { CONFIG } from '../config.ts';
+import { logger } from '../logger.ts';
+import type { Candle } from '../types.ts';
 
 export class PriceHistoryModule {
   // Histórico por símbolo Binance (ex: BTCUSDT)
@@ -19,20 +19,19 @@ export class PriceHistoryModule {
    * Inicializa o histórico buscando candles passados da Binance.
    */
   async bootstrap(): Promise<void> {
-    const assets = Array.from(
-      new Set(Object.values(CONFIG.monitoring.seriesToAssetMap)),
-    );
+    const assets = Array.from(new Set(Object.values(CONFIG.monitoring.seriesToAssetMap)));
     logger.log(`[PriceHistory] Bootstrapping ${assets.length} ativos...`);
 
     await Promise.all(assets.map((symbol) => this.fetchBinanceHistory(symbol)));
 
     logger.log(
-      `[PriceHistory] Bootstrap completo: ${Array.from(this.histories.keys()).join(", ")}`,
+      `[PriceHistory] Bootstrap completo: ${Array.from(this.histories.keys()).join(', ')}`,
     );
   }
 
   private async fetchBinanceHistory(symbol: string): Promise<void> {
     const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=5m&limit=50`;
+
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

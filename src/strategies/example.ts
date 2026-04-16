@@ -1,33 +1,41 @@
 import type { MarketState, Order, OrderStrategy, Candle } from "../types.ts";
 
+let lastActionTime = 0;
+const TEST_INTERVAL_MS = 1000;
+
 export const exampleStrategy: OrderStrategy = {
-  id: "example-rsi-strat",
-  seriesIds: [10684, 10685, 10686], // Exemplo de séries alvo
+  id: "example-test-strat",
+  seriesIds: [10684, 10685, 10686],
   shouldExecute(state: MarketState, _history: Candle[]): boolean {
-    // Muito mais permissivo: entra se houver liquidez no ask
-    return state.bestAskUp > 0;
+    const now = Date.now();
+    if (now - lastActionTime < TEST_INTERVAL_MS) return false;
+
+    // Entrada ultra-permissiva para teste constante
+    if (state.bestAskUp > 0) {
+      lastActionTime = now;
+      return true;
+    }
+    return false;
   },
   getOrderPayload(state: MarketState, _history: Candle[]) {
     return {
       tokenId: state.upTokenId,
       side: "BUY" as const,
-      size: 1, // Tamanho menor para teste
+      size: 1,
       price: state.bestAskUp,
     };
   },
   shouldExit(
-    state: MarketState,
-    currentPosition: Order,
+    _state: MarketState,
+    _currentPosition: Order,
     _history: Candle[],
   ): boolean {
-    const currentPrice =
-      currentPosition.tokenId === state.upTokenId
-        ? state.bestBidUp
-        : state.bestBidDown;
-    if (currentPrice === 0) return false;
-    const pnl = currentPrice - currentPosition.price;
-    // Sai com qualquer lucro ou perda mínima para girar ordens rápido
-    return Math.abs(pnl) > 0.001; 
+    const now = Date.now();
+    if (now - lastActionTime < TEST_INTERVAL_MS) return false;
+
+    // Saída imediata após o intervalo para testar fluxo da UI
+    lastActionTime = now;
+    return true;
   },
   getExitPayload(
     state: MarketState,
