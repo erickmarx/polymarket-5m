@@ -22,3 +22,22 @@
   }
 }
 
+@layer utilities {
+  .bg-void { background-color: var(--color-void); }
+  .text-muted { color: var(--color-muted); }
+  .text-ghost { color: var(--color-ghost); }
+  .bg-frosted { background-color: var(--color-frosted); }
+  .border-ring { box-shadow: var(--shadow-ring); }
+  .shadow-floating { box-shadow: var(--shadow-floating); }
+  .bg-framer-blue { background-color: var(--color-framer-blue); }
+  .text-framer-blue { color: var(--color-framer-blue); }
+  
+  .font-body {
+    font-feature-settings: "cv01", "cv05", "cv09", "cv11", "ss03", "ss07";
+  }
+
+  .card-rounded {
+    border-radius: 12px;
+  }
+}
+
