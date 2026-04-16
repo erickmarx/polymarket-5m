@@ -23,12 +23,23 @@ export class ApiModule {
     
     Bun.serve<ServerWebSocketData>({
       port: this.port,
-      fetch(req, server) {
+      async fetch(req, server) {
         // Upgrade to WebSocket
         if (server.upgrade(req, { data: { id: crypto.randomUUID() } })) {
           return;
         }
-        return new Response("Polymarket Monitor API");
+
+        const url = new URL(req.url);
+        let path = url.pathname;
+        if (path === '/') path = '/index.html';
+
+        // Tenta servir arquivos estáticos do frontend
+        const file = Bun.file(`./src/web/dist${path}`);
+        if (await file.exists()) {
+          return new Response(file);
+        }
+
+        return new Response("Not Found", { status: 404 });
       },
       websocket: {
         open(ws) {

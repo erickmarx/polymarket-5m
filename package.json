@@ -6,6 +6,8 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun --watch src/index.ts",
+    "dev:all": "concurrently \"bun run src/index.ts\" \"cd src/web && bun run dev\"",
+    "build:web": "cd src/web && bun run build",
     "dashboard": "bun src/ui/cli.tsx",
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "lint": "bun x eslint src/**",
@@ -14,6 +16,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/bun": "latest",
+    "concurrently": "^9.2.1",
     "eslint": "^10.2.0",
     "eslint-plugin-react": "^7.37.5",
     "prettier": "^3.8.3",
