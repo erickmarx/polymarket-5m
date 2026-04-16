@@ -230,8 +230,14 @@ export class MonitoringModule {
 
       // 1. Mudança de preço no mercado (CLOB)
       if (msg.event_type === "price_change" && Array.isArray(msg.price_changes)) {
+        const updated = new Set<string>();
         for (const change of msg.price_changes) {
-          this.applyPriceChange(change);
+          const conditionId = this.applyPriceChange(change);
+          if (conditionId) updated.add(conditionId);
+        }
+        for (const conditionId of updated) {
+          const market = this.markets.get(conditionId);
+          if (market) this.onPriceChange(market);
         }
       }
 
@@ -264,12 +270,12 @@ export class MonitoringModule {
     }
   }
 
-  private applyPriceChange(msg: WsPriceChange): void {
+  private applyPriceChange(msg: WsPriceChange): string | null {
     const conditionId = this.tokenIndex.get(msg.asset_id);
-    if (!conditionId) return;
+    if (!conditionId) return null;
 
     const market = this.markets.get(conditionId);
-    if (!market) return;
+    if (!market) return null;
 
     const bid = parseFloat(msg.best_bid ?? "0");
     const ask = parseFloat(msg.best_ask ?? "0");
@@ -284,7 +290,7 @@ export class MonitoringModule {
     }
 
     market.updatedAt = Date.now();
-    this.onPriceChange(market);
+    return conditionId;
   }
 
   private startHeartbeat(): void {

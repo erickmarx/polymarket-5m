@@ -1,4 +1,5 @@
 import { logger } from '../logger.ts';
+import { CONFIG } from '../config.ts';
 import type { MarketState, Order } from '../types.ts';
 import type { StrategyStatusManager } from './status-manager.ts';
 import type { ExecutionModule } from './execution.ts';
@@ -51,7 +52,7 @@ export class ApiModule {
           self.handleMessage(ws, message as string);
         },
         close(ws) {
-          self.clients.add(ws);
+          self.clients.delete(ws);
           logger.debug(`[API] Client disconnected: ${ws.data.id}`);
         },
       },
@@ -73,6 +74,7 @@ export class ApiModule {
         activeOrders: this.execution.getActiveOrders(),
         filledOrders: this.execution.getFilledOrders(),
         markets: Array.from(this.discovery.getMarkets().values()),
+        mode: CONFIG.trading.mode,
       }
     };
     ws.send(JSON.stringify(state));
