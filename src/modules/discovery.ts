@@ -111,7 +111,11 @@ export class DiscoveryModule {
       const current = active.find((m) => m.marketEndDate > nowMs);
       const isExpiringSoon = current && current.marketEndDate - nowMs < 60_000;
 
-      if (active.length <= 2 || isExpiringSoon) {
+      // Busca nova série só quando o buffer está vazio OU mercado atual expira em <30s
+      // (não a cada tick quando buffer tem 1-2 mercados — causava reconexão WS contínua)
+      const criticallyLow = active.length === 0;
+      const almostExpired = current && current.marketEndDate - nowMs < 30_000;
+      if (criticallyLow || almostExpired) {
         await this.fetchSeries(seriesId);
       }
     }

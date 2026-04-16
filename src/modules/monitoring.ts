@@ -115,7 +115,7 @@ export class MonitoringModule {
           // RTDS é por símbolo, só muda se SERIES_IDS/ASSETS no .env mudarem (raro em runtime)
         }
       }
-    }, 1_000);
+    }, 15_000);
   }
 
   private getAllTokenIds(): string[] {
@@ -277,16 +277,19 @@ export class MonitoringModule {
     const market = this.markets.get(conditionId);
     if (!market) return null;
 
-    const bid = parseFloat(msg.best_bid ?? "0");
-    const ask = parseFloat(msg.best_ask ?? "0");
+    // Só atualiza se o valor veio na mensagem — espelha o upd() do Python
+    // que só escreve quando b/a não é None. Mensagens price_change frequentemente
+    // carregam só um lado; sobrescrever o outro com 0 corrompe prob_up.
+    const bid = msg.best_bid !== undefined ? parseFloat(msg.best_bid) : 0;
+    const ask = msg.best_ask !== undefined ? parseFloat(msg.best_ask) : 0;
     const isUp = msg.asset_id === market.upTokenId;
 
     if (isUp) {
-      market.bestBidUp = bid;
-      market.bestAskUp = ask;
+      if (bid > 0) market.bestBidUp = bid;
+      if (ask > 0) market.bestAskUp = ask;
     } else {
-      market.bestBidDown = bid;
-      market.bestAskDown = ask;
+      if (bid > 0) market.bestBidDown = bid;
+      if (ask > 0) market.bestAskDown = ask;
     }
 
     market.updatedAt = Date.now();

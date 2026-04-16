@@ -36,7 +36,7 @@ function formatPct(p: number): string {
 }
 
 export default function App() {
-  const { status, strategies, logs, activeOrders, markets, mode, toggleStrategy, emergencyCancel } = useWebSocket()
+  const { status, strategies, logs, activeOrders, filledOrders, markets, mode, toggleStrategy, emergencyCancel } = useWebSocket()
   const logRef = useRef<HTMLDivElement>(null)
   const isConnected = status === 'connected'
 
@@ -144,20 +144,16 @@ export default function App() {
             </div>
           </Panel>
 
-          {/* Filled count */}
-          <div
-            className="rounded-xl px-4 py-3 flex items-center gap-3"
-            style={{ background: '#090909', boxShadow: '0 0 0 1px rgba(0,153,255,0.12)' }}
-          >
-            <TrendingUp className="w-4 h-4 text-muted shrink-0" />
-            <div>
-              <div className="text-[11px] text-muted uppercase tracking-widest font-semibold">Filled Today</div>
+          {/* Filled orders panel */}
+          <Panel icon={<TrendingUp />} title="Filled Today" badge={filledOrders.length || undefined} flex>
+            <div className="flex-1 overflow-y-auto space-y-2 min-h-[120px]">
+              {filledOrders.length === 0 ? (
+                <Empty>No fills yet…</Empty>
+              ) : (
+                filledOrders.slice(0, 5).map(o => <OrderRow key={o.id} order={o} />)
+              )}
             </div>
-            <span className="ml-auto text-[22px] font-display font-bold text-white leading-none">
-              {/* filled orders from SYNC_STATE would be tracked here */}
-              —
-            </span>
-          </div>
+          </Panel>
         </div>
 
         {/* Right: 8 cols */}

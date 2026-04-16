@@ -36,6 +36,14 @@ export class StrategyStatusManager {
     }
   }
 
+  // Garante que a estratégia apareça no dashboard mesmo sem ter sido toggleada
+  ensure(strategyId: string): void {
+    if (!(strategyId in this.statusMap)) {
+      this.statusMap[strategyId] = { active: true };
+      this.save();
+    }
+  }
+
   isActive(strategyId: string): boolean {
     // Por padrão, se não estiver no mapa, consideramos ativa
     return this.statusMap[strategyId]?.active !== false;

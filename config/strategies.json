@@ -1,5 +1,8 @@
 {
   "example-test-strat": {
     "active": false
+  },
+  "polymarket-signal": {
+    "active": true
   }
 }

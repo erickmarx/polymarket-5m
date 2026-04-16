@@ -10,9 +10,18 @@ export class ExecutionModule {
   private strategies: OrderStrategy[] = [];
   private conditionToAsset: Map<string, string> = new Map();
   private statusManager: StrategyStatusManager;
+  private onOrderEvent: ((order: Order) => void) | null = null;
 
   constructor(private priceHistory: PriceHistoryModule) {
     this.statusManager = new StrategyStatusManager();
+  }
+
+  setOrderEventCallback(cb: (order: Order) => void): void {
+    this.onOrderEvent = cb;
+  }
+
+  private emitOrder(order: Order): void {
+    this.onOrderEvent?.(order);
   }
 
   getStatusManager(): StrategyStatusManager {
@@ -21,6 +30,7 @@ export class ExecutionModule {
 
   registerStrategy(strategy: OrderStrategy): void {
     this.strategies.push(strategy);
+    this.statusManager.ensure(strategy.id);
   }
 
   setConditionToAssetMap(map: Map<string, string>): void {
@@ -28,17 +38,13 @@ export class ExecutionModule {
   }
 
   async evaluate(state: MarketState): Promise<void> {
+    // symbol pode ser null durante transição de mercado — não bloqueia a estratégia
+    // pois polymarket-signal usa tick buffer interno, não o histórico Binance
     const symbol = this.conditionToAsset.get(state.conditionId);
-
-    if (!symbol) return;
-
-    if (!this.priceHistory) {
-      logger.error(`[Execution] PriceHistoryModule não inicializado.`);
-      return;
+    const history = symbol ? this.priceHistory.getHistory(symbol) : [];
+    if (symbol) {
+      logger.debug(`[Execution] ${symbol}: ${history.length} candles carregados para avaliação.`);
     }
-
-    const history = this.priceHistory.getHistory(symbol);
-    logger.debug(`[Execution] ${symbol}: ${history.length} candles carregados para avaliação.`);
 
     for (const strategy of this.strategies) {
       if (!strategy.seriesIds.includes(state.seriesId)) continue;
@@ -47,10 +53,13 @@ export class ExecutionModule {
         continue;
       }
 
-      // Busca ordem FILLED ativa para este mercado E estratégia
+      // Busca ordem BUY FILLED ativa para este mercado E estratégia
       const currentPosition = this.filledOrders.find(
         (o) =>
-          o.status === 'FILLED' && o.strategyId === strategy.id && this.isOrderForMarket(o, state),
+          o.status === 'FILLED' &&
+          o.side === 'BUY' &&
+          o.strategyId === strategy.id &&
+          this.isOrderForMarket(o, state),
       );
 
       if (currentPosition) {
@@ -59,12 +68,20 @@ export class ExecutionModule {
             `[Execution] ${strategy.id}: Iniciando SAÍDA para ${state.conditionId.slice(0, 8)}…`,
           );
           const payload = await strategy.getExitPayload(state, currentPosition, history);
-          // Marcamos a posição antiga como 'saindo'
-          currentPosition.id = `exiting-${currentPosition.id}`;
+          // Marca como CANCELLED para não re-triggerar shouldExit nos próximos ticks
+          currentPosition.status = 'CANCELLED';
           this.dispatchOrder(state.conditionId, payload, strategy.id);
         }
         continue;
       }
+
+      // Bloqueia nova entrada se já há ordem PENDING/LIVE para este mercado+estratégia
+      // Espelha: "if paper.posicao or paper._fila: return" do Python
+      const hasPending = Array.from(this.activeOrders.values()).some(
+        (o) => o.strategyId === strategy.id && this.isOrderForMarket(o, state),
+      );
+      if (hasPending) continue;
+
       if (await strategy.shouldExecute(state, history)) {
         logger.log(
           `[Execution] ${strategy.id}: Iniciando ENTRADA para ${state.conditionId.slice(0, 8)}…`,
@@ -109,6 +126,7 @@ export class ExecutionModule {
   private executeDryRun(conditionId: string, order: Order): void {
     order.status = 'LIVE';
     this.activeOrders.set(order.id, order);
+    this.emitOrder(order);
     logger.log(
       `[Execution][DryRun] ${order.side} ${order.size} @ ${order.price} — market: ${conditionId.slice(0, 10)}...`,
     );
@@ -118,6 +136,7 @@ export class ExecutionModule {
       order.filledAt = Date.now();
       this.activeOrders.delete(order.id);
       this.filledOrders.push(order);
+      this.emitOrder(order);
       logger.log(`[Execution][DryRun] FILLED ${order.id}`);
     }, 2_000);
   }
@@ -126,6 +145,7 @@ export class ExecutionModule {
     try {
       order.status = 'LIVE';
       this.activeOrders.set(order.id, order);
+      this.emitOrder(order);
 
       const response = await fetch(`${CONFIG.api.clobBaseUrl}/order`, {
         method: 'POST',
@@ -155,6 +175,7 @@ export class ExecutionModule {
       logger.error(`[Execution][Live] Falha: ${message}`);
       order.status = 'CANCELLED';
       this.activeOrders.delete(order.id);
+      this.emitOrder(order);
     }
   }
 
@@ -180,11 +201,13 @@ export class ExecutionModule {
           order.filledAt = Date.now();
           this.activeOrders.delete(order.id);
           this.filledOrders.push(order);
+          this.emitOrder(order);
           logger.log(`[Execution][Live] FILLED: ${remoteId}`);
         } else if (status === 'CANCELLED' || status === 'REJECTED') {
           clearInterval(interval);
           order.status = 'CANCELLED';
           this.activeOrders.delete(order.id);
+          this.emitOrder(order);
           logger.log(`[Execution][Live] ${status}: ${remoteId}`);
         }
       } catch (err: unknown) {

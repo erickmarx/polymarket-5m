@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(bun init *)",
+      "Bash(bun add *)",
+      "Bash(mkdir -p /root/polymarket-5m/src/modules /root/polymarket-5m/src/ui)",
+      "Bash(rm /root/polymarket-5m/index.ts)",
+      "Bash(bun run *)",
+      "Bash(bun remove *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(bun install *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

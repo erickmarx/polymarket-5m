@@ -20,6 +20,7 @@ async function main() {
   const execution = new ExecutionModule(priceHistory);
   const resolution = new ResolutionHandler();
   const api = new ApiModule(discovery, execution, execution.getStatusManager());
+  execution.setOrderEventCallback((order) => api.broadcastOrderEvent(order));
 
   strategies.forEach((s) => execution.registerStrategy(s));
 
